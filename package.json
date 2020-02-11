@@ -1,0 +1,20 @@
+{
+  "name": "musicbot-ts",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^13.7.0",
+    "@types/node-fetch": "^2.5.4",
+    "typescript": "^3.7.5"
+  },
+  "dependencies": {
+    "axios": "^0.19.2",
+    "discord.js": "^11.5.1",
+    "dotenv-safe": "^8.2.0",
+    "node-fetch": "^2.6.0",
+    "opusscript": "^0.0.7",
+    "pictograph": "^2.3.0",
+    "rndstr": "^1.0.0"
+  }
+}
