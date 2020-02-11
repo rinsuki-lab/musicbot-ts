@@ -14,4 +14,4 @@ COPY .env.example tsconfig.json README.md ./
 COPY src ./src
 RUN yarn tsc
 
-CMD ["yarn", "start"]
+CMD ["node", "."]
