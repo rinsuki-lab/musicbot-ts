@@ -154,7 +154,7 @@ export class NiconicoProvider {
         if (dmcEndRes.meta.status >= 400) {
             console.error(dmcEndRes.meta)
             await fs.promises.unlink(path)
-            throw new NotificatableError(`niconico.dmcEnd: ${dmcEndRes.message} (status: ${dmcEndRes.status})`)
+            throw new NotificatableError(`niconico.dmcEnd: ${dmcEndRes.meta.message} (status: ${dmcEndRes.meta.status})`)
         }
         return path
     }
