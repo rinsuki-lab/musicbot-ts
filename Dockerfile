@@ -1,6 +1,6 @@
 FROM node:12-alpine
 
-RUN apk --no-cache add python3
+RUN apk --no-cache add python3 ffmpeg
 
 WORKDIR /app
 
