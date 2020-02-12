@@ -42,7 +42,7 @@ function isNotNull<T>(input: T | null | undefined): input is T {
     return input != null
 }
 
-function matchProvider(text: string): [IProvider, string] | null {
+function getProviderAndId(text: string): [IProvider, string] | null {
     for (const provider of providers) {
         const id = provider.test(text)
         if (id == null) continue
@@ -198,7 +198,7 @@ client.on("message", async msg => {
                 if (vc == null) return await msg.reply("通話に入ってから言ってください")
                 const c = vc.connection
                 if (c == null) return await msg.reply("先に !join してください")
-                const result = matchProvider(args[1])
+                const result = getProviderAndId(args[1])
                 if (result == null) return await msg.reply("マッチしませんでした…")
                 const [provider, id] = result
                 const react = await msg.react(emojiDic["arrow_down"]!)
@@ -310,7 +310,7 @@ client.on("message", async msg => {
                 })
             },
             async recache() {
-                const result = matchProvider(args[1])
+                const result = getProviderAndId(args[1])
                 if (result == null) return await msg.reply("マッチしませんでした…")
                 const [provider, id] = result
                 const key = [provider, id].join(":")
