@@ -8,6 +8,8 @@ export class DownloadQueue {
         this.downloadPromise[key] = (async () => {
             try {
                 return await p
+            } catch (e) {
+                throw e
             } finally {
                 delete this.downloadPromise[key]
             }
