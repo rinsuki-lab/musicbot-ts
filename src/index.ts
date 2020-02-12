@@ -1,17 +1,5 @@
 require("dotenv-safe").config()
-import {
-    Client,
-    VoiceBroadcast,
-    MessageReaction,
-    Message,
-    VoiceConnection,
-    TextChannel,
-    RichEmbed,
-    RichEmbedOptions,
-    VoiceChannel,
-} from "discord.js"
-import { YouTubeProvider } from "./providers/youtube"
-import { NiconicoProvider } from "./providers/niconico"
+import { Client, MessageReaction, Message, VoiceConnection, TextChannel } from "discord.js"
 import { dic as emojiDic } from "pictograph"
 import { NotificatableError } from "./classes/notificatable-error"
 import { IProvider } from "./interfaces/provider"

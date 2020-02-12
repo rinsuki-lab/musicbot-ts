@@ -1,8 +1,6 @@
 import { YouTubeProvider } from "../providers/youtube"
 import { NiconicoProvider } from "../providers/niconico"
 import { IProvider } from "../interfaces/provider"
-import { RichEmbedOptions } from "discord.js"
-import { NotificatableError } from "../classes/notificatable-error"
 import { ProviderAndID } from "../classes/provider-and-id"
 
 export class ProviderManager {

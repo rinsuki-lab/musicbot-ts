@@ -1,4 +1,4 @@
-import fs, { watch } from "fs"
+import fs from "fs"
 import fetch from "node-fetch"
 import rndstr from "rndstr"
 import { NotificatableError } from "../classes/notificatable-error"

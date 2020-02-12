@@ -1,4 +1,3 @@
-import Axios from "axios"
 import fetch from "node-fetch"
 import fs from "fs"
 import childProcess from "child_process"
