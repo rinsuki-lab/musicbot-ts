@@ -1,6 +1,7 @@
 import { IProvider } from "../interfaces/provider"
 import { RichEmbedOptions } from "discord.js"
 import { NotificatableError } from "./notificatable-error"
+import { upToNLines } from "../utils/up-to-n-lines"
 
 export class ProviderAndID {
     constructor(public readonly provider: IProvider, public readonly id: string) {}
@@ -18,27 +19,37 @@ export class ProviderAndID {
     }
 
     getRichEmbed(): Promise<RichEmbedOptions> {
-        return this.provider.richEmbed(this.id).catch(e => {
-            console.error(e)
-            if (e instanceof NotificatableError) {
+        return this.provider
+            .richEmbed(this.id)
+            .then(embed => ({
+                ...embed,
+                ...(!embed.description
+                    ? {}
+                    : {
+                          description: upToNLines(embed.description, 10),
+                      }),
+            }))
+            .catch(e => {
+                console.error(e)
+                if (e instanceof NotificatableError) {
+                    return {
+                        title: "カード展開エラー",
+                        description: e.message,
+                        color: 0xff0000,
+                        footer: {
+                            text: "musicbot-ts",
+                        },
+                    } as RichEmbedOptions
+                }
                 return {
                     title: "カード展開エラー",
-                    description: e.message,
+                    description: "JavaScriptエラー",
                     color: 0xff0000,
                     footer: {
                         text: "musicbot-ts",
                     },
                 } as RichEmbedOptions
-            }
-            return {
-                title: "カード展開エラー",
-                description: "JavaScriptエラー",
-                color: 0xff0000,
-                footer: {
-                    text: "musicbot-ts",
-                },
-            } as RichEmbedOptions
-        })
+            })
     }
 
     downloadWithoutQueue(): Promise<string> {
