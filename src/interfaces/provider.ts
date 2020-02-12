@@ -1,3 +1,5 @@
+import { RichEmbedOptions } from "discord.js"
+
 export interface IProvider {
     readonly key: string
 
@@ -6,4 +8,6 @@ export interface IProvider {
     urlFromId(id: string): string
 
     download(id: string): Promise<string>
+
+    richEmbed(id: string): Promise<RichEmbedOptions>
 }

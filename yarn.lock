@@ -88,6 +88,11 @@ pictograph@^2.3.0:
   resolved "https://registry.yarnpkg.com/pictograph/-/pictograph-2.3.0.tgz#51f38305f8c96409712a2783eec8083058f7a7ba"
   integrity sha512-4UFybCgk0jwQiZC65j4G1ejXWNDkpTd3/lx1vcNDeIIzqwRH3FrY1e8mQUg4Fge+5wOMS1GJgs06HR+DMweJUg==
 
+prettier@^1.19.1:
+  version "1.19.1"
+  resolved "https://registry.yarnpkg.com/prettier/-/prettier-1.19.1.tgz#f7d7f5ff8a9cd872a7be4ca142095956a60797cb"
+  integrity sha512-s7PoyDv/II1ObgQunCbB9PdLmUcBZcnWOcxDh7O0N/UwDEsHyqkW+Qh28jW+mVuCdx7gLB0BotYI1Y6uI9iyew==
+
 prism-media@^0.0.3:
   version "0.0.3"
   resolved "https://registry.yarnpkg.com/prism-media/-/prism-media-0.0.3.tgz#8842d4fae804f099d3b48a9a38e3c2bab6f4855b"

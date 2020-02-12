@@ -1,5 +1,14 @@
 require("dotenv-safe").config()
-import { Client, VoiceBroadcast, MessageReaction, Message, VoiceConnection } from "discord.js"
+import {
+    Client,
+    VoiceBroadcast,
+    MessageReaction,
+    Message,
+    VoiceConnection,
+    TextChannel,
+    RichEmbed,
+    RichEmbedOptions,
+} from "discord.js"
 import { YouTubeProvider } from "./providers/youtube"
 import { NiconicoProvider } from "./providers/niconico"
 import { dic as emojiDic } from "pictograph"
@@ -18,8 +27,9 @@ interface QueueObj {
     react: MessageReaction
 }
 
-var nowPlaying: {[key: string]: QueueObj} = {}
-var queue: {[key: string]: QueueObj[]} = {}
+var nowPlaying: { [key: string]: QueueObj } = {}
+var queue: { [key: string]: QueueObj[] } = {}
+var loggingChannel: { [key: string]: TextChannel } = {}
 
 async function nextQueue(c: VoiceConnection) {
     if (c.dispatcher) return c.dispatcher.end()
@@ -29,18 +39,46 @@ async function nextQueue(c: VoiceConnection) {
     try {
         await q.react.remove()
         await q.msg.react(emojiDic["arrow_forward"]!)
-    } catch(e) {
+    } catch (e) {
         console.error(e)
     }
     nowPlaying[c.channel.id] = q
     const dispatcher = c.playFile(q.path, {
-        volume: 0.25
+        volume: 0.25,
     })
     dispatcher.on("end", () => {
         delete nowPlaying[c.channel.id]
         console.log("end", q)
         nextQueue(c)
     })
+
+    const channel = loggingChannel[c.channel.guild.id]
+    if (channel != null) {
+        const url = q.provider.urlFromId(q.id)
+        await channel.send("NowPlaying: " + url + " requested by <@" + q.msg.author.id + ">", {
+            embed: await q.provider.richEmbed(q.id).catch(e => {
+                console.error(e)
+                if (e instanceof NotificatableError) {
+                    return {
+                        title: "カード展開エラー",
+                        description: e.message,
+                        color: 0xff0000,
+                        footer: {
+                            text: "musicbot-ts",
+                        },
+                    } as RichEmbedOptions
+                }
+                return {
+                    title: "カード展開エラー",
+                    description: "JavaScriptエラー",
+                    color: 0xff0000,
+                    footer: {
+                        text: "musicbot-ts",
+                    },
+                } as RichEmbedOptions
+            }),
+        })
+    }
 }
 
 async function addQueue(c: VoiceConnection, q: QueueObj, isWarikomi: boolean) {
@@ -63,45 +101,58 @@ client.on("message", async msg => {
     try {
         const args = msg.content.split(" ")
         var isWarikomi = false
-        switch(args[0]) {
-        case "!warikomi":
-            isWarikomi = true
-        case "!play":
-            {
-                const vc = msg.member.voiceChannel
-                if (vc == null) return await msg.reply("通話に入ってから言ってください")
-                const c = vc.connection
-                if (c == null) return await msg.reply("先に !join してください")
-                for (const provider of providers) {
-                    const id = provider.test(args[1])
-                    if (id == null) continue
-                    react = await msg.react(emojiDic["arrow_down"]!)
-                    const path = await provider.download(id)
-                    react.remove()
-                    react = null
-                    addQueue(c, {
-                        provider,
-                        id,
-                        path,
-                        msg,
-                        react: await msg.react(emojiDic["soon"]!),
-                    }, isWarikomi)
-                    return
+        switch (args[0]) {
+            case "!warikomi":
+                isWarikomi = true
+            case "!play":
+                {
+                    const vc = msg.member.voiceChannel
+                    if (vc == null) return await msg.reply("通話に入ってから言ってください")
+                    const c = vc.connection
+                    if (c == null) return await msg.reply("先に !join してください")
+                    for (const provider of providers) {
+                        const id = provider.test(args[1])
+                        if (id == null) continue
+                        react = await msg.react(emojiDic["arrow_down"]!)
+                        const path = await provider.download(id)
+                        react.remove()
+                        react = null
+                        addQueue(
+                            c,
+                            {
+                                provider,
+                                id,
+                                path,
+                                msg,
+                                react: await msg.react(emojiDic["soon"]!),
+                            },
+                            isWarikomi,
+                        )
+                        return
+                    }
+                    await msg.reply("マッチしませんでした…")
                 }
-                await msg.reply("マッチしませんでした…")
-            }
-            break
-        case "!join":
-            {
+                break
+            case "!join": {
                 const vc = msg.member.voiceChannel
                 if (vc == null) return await msg.reply("通話に入ってから言ってください")
                 const c = await vc.join()
                 delete nowPlaying[c.channel.id]
                 delete queue[c.channel.id]
+                const channels = msg.guild.channels
+                    .filter(c => c.type === "text")
+                    .array() as TextChannel[]
+                const channel = channels.find(
+                    c => c.topic != null && c.topic.includes("!musicbot-ts-logging-channel"),
+                )
+                if (channel != null) {
+                    loggingChannel[msg.guild.id] = channel
+                } else {
+                    delete loggingChannel[msg.guild.id]
+                }
                 break
             }
-        case "!leave":
-            {
+            case "!leave": {
                 const vc = msg.member.voiceChannel
                 if (vc == null) return await msg.reply("通話に入ってから言ってください")
                 const c = vc.connection
@@ -109,58 +160,60 @@ client.on("message", async msg => {
                 c.disconnect()
                 break
             }
-        case "!queue":
-            {
-                const vc = msg.member.voiceChannel
-                if (vc == null) return await msg.reply("通話に入ってから言ってください")
-                const np = nowPlaying[vc.id]
-                const qs = queue[vc.id] || []
-                const m = [`${qs.length} queues`]
-                if (np != null) {
-                    m.push("Now Playing: " + np.provider.urlFromId(np.id))
-                    m.push("-----")
+            case "!queue":
+                {
+                    const vc = msg.member.voiceChannel
+                    if (vc == null) return await msg.reply("通話に入ってから言ってください")
+                    const np = nowPlaying[vc.id]
+                    const qs = queue[vc.id] || []
+                    const m = [`${qs.length} queues`]
+                    if (np != null) {
+                        m.push("Now Playing: " + np.provider.urlFromId(np.id))
+                        m.push("-----")
+                    }
+                    for (const [i, q] of qs.entries()) {
+                        m.push(`${i + 1}. ${q.provider.urlFromId(q.id)}`)
+                    }
+                    await msg.reply(m.join("\n"))
                 }
-                for (const [i, q] of qs.entries()) {
-                    m.push(`${i+1}. ${q.provider.urlFromId(q.id)}`)
+                break
+            case "!skip":
+                {
+                    const vc = msg.member.voiceChannel
+                    if (vc == null) return await msg.reply("通話に入ってから言ってください")
+                    const c = vc.connection
+                    if (c == null) return await msg.reply("入ってませんけど…")
+                    const d = c.dispatcher
+                    if (d == null) return await msg.reply("何も再生してなさそう")
+                    d.end()
+                    await msg.react(emojiDic["white_check_mark"]!)
                 }
-                await msg.reply(m.join("\n"))
-            }
-            break
-        case "!skip":
-            {
-                const vc = msg.member.voiceChannel
-                if (vc == null) return await msg.reply("通話に入ってから言ってください")
-                const c = vc.connection
-                if (c == null) return await msg.reply("入ってませんけど…")
-                const d = c.dispatcher
-                if (d == null) return await msg.reply("何も再生してなさそう")
-                d.end()
-                await msg.react(emojiDic["white_check_mark"]!)
-            }
-            break
-        case "!help":
-            return await msg.reply([
-                "commands: ",
-                "```",
-                "!(play|warikomi) <URL or nicovideo id> (supported: YouTube, NicoVideo)",
-                "!join",
-                "!leave",
-                "!queue",
-                "!skip",
-                "!help",
-                "```",
-            ].join("\n"))
-        default:
-            await msg.reply("知らないコマンドです")
+                break
+            case "!help":
+                return await msg.reply(
+                    [
+                        "commands: ",
+                        "```",
+                        "!(play|warikomi) <URL or nicovideo id> (supported: YouTube, NicoVideo)",
+                        "!join",
+                        "!leave",
+                        "!queue",
+                        "!skip",
+                        "!help",
+                        "```",
+                    ].join("\n"),
+                )
+            default:
+                await msg.reply("知らないコマンドです")
         }
-    } catch(e) {
+    } catch (e) {
         console.error(e)
         try {
             if (react != null) {
                 await react.remove()
                 await msg.react(emojiDic["sos"]!)
             }
-        } catch(e) {
+        } catch (e) {
             console.error(e)
         }
         if (e instanceof NotificatableError) {
