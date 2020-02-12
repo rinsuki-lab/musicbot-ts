@@ -21,14 +21,13 @@ export class ProviderAndID {
     getRichEmbed(): Promise<RichEmbedOptions> {
         return this.provider
             .richEmbed(this.id)
-            .then(embed => ({
-                ...embed,
-                ...(!embed.description
-                    ? {}
-                    : {
-                          description: upToNLines(embed.description, 10),
-                      }),
-            }))
+            .then(embed => {
+                if (!embed.description) return embed
+                return {
+                    ...embed,
+                    description: upToNLines(embed.description, 10),
+                }
+            })
             .catch(e => {
                 console.error(e)
                 if (e instanceof NotificatableError) {
