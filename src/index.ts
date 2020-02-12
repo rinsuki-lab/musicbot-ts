@@ -153,7 +153,7 @@ client.on("message", async msg => {
                 const react = await msg.react(emojiDic["arrow_down"]!)
                 const path = await DownloadQueue.download(pi)
                 await react.remove()
-                addQueue(
+                await addQueue(
                     c,
                     {
                         pi,
