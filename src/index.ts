@@ -127,7 +127,6 @@ async function nextQueue(c: VoiceConnection) {
     const channel = loggingChannel[c.channel.guild.id]
     if (channel != null && q.from != null) {
         const url = q.provider.urlFromId(q.id)
-        const requestUser = q.from != null ? `<@${q.from.msg.author.id}>` : "autoqueue"
         await channel.send("NowPlaying: " + url + " requested by <@" + q.from.msg.author.id + ">", {
             embed: await getRichEmbedFromQueue(q),
         })
@@ -260,6 +259,20 @@ client.on("message", async msg => {
                         )
                 }
             },
+            async np() {
+                const vc = msg.guild.voiceConnection
+                if (vc == null) return await msg.reply("ボイスチャンネルに入っていません")
+                const q = nowPlaying[vc.channel.id]
+                if (q == null) return await msg.reply("何も再生していません")
+                const url = q.provider.urlFromId(q.id)
+                const requestUser =
+                    q.from != null
+                        ? `<@${q.from.msg.author.id}>`
+                        : "autoqueue (you can disable with `!autoqueue disable`)"
+                await msg.reply("NowPlaying: " + url + " requested by " + requestUser, {
+                    embed: await getRichEmbedFromQueue(q),
+                })
+            },
             async help() {
                 await msg.reply(
                     [
@@ -270,6 +283,8 @@ client.on("message", async msg => {
                         "!leave",
                         "!queue",
                         "!skip",
+                        "!autoqueue <|enable|disable>",
+                        "!np",
                         "!help",
                         "```",
                     ].join("\n"),
