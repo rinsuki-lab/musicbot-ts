@@ -14,6 +14,7 @@ import { NiconicoProvider } from "./providers/niconico"
 import { dic as emojiDic } from "pictograph"
 import { NotificatableError } from "./notificatable-error"
 import { IProvider } from "./interfaces/provider"
+import fs from "fs"
 
 const providers: IProvider[] = [YouTubeProvider, NiconicoProvider]
 
@@ -23,24 +24,95 @@ interface QueueObj {
     provider: IProvider
     id: string
     path: string
-    msg: Message
-    react: MessageReaction
+    from: {
+        msg: Message
+        react: MessageReaction
+    } | null
 }
 
 var nowPlaying: { [key: string]: QueueObj } = {}
 var queue: { [key: string]: QueueObj[] } = {}
 var loggingChannel: { [key: string]: TextChannel } = {}
+var autoQueue: { [key: string]: boolean } = {}
+
+function isNotNull<T>(input: T | null | undefined): input is T {
+    return input != null
+}
+
+async function getRichEmbedFromQueue(q: QueueObj): Promise<RichEmbedOptions> {
+    return await q.provider.richEmbed(q.id).catch(e => {
+        console.error(e)
+        if (e instanceof NotificatableError) {
+            return {
+                title: "カード展開エラー",
+                description: e.message,
+                color: 0xff0000,
+                footer: {
+                    text: "musicbot-ts",
+                },
+            } as RichEmbedOptions
+        }
+        return {
+            title: "カード展開エラー",
+            description: "JavaScriptエラー",
+            color: 0xff0000,
+            footer: {
+                text: "musicbot-ts",
+            },
+        } as RichEmbedOptions
+    })
+}
+
+async function getRandomQueue(count = 0): Promise<QueueObj | undefined> {
+    if (count > 10) return
+    const r = /^([a-z]+):([^\.]+)\.[^\.]+$/
+
+    const files = await fs.promises
+        .readdir(__dirname + "/../cache")
+        .then(f => f.map(f => r.exec(f)).filter(isNotNull))
+    if (files.length == 0) return
+    const file = files[Math.floor(Math.random() * files.length)]
+    if (file == null) return
+    console.log("random selected file:", file[0])
+
+    const providerKey = file[1]
+    const id = file[2]
+    const provider = providers.find(p => p.key === providerKey)
+    if (provider == null) return await getRandomQueue(count + 1)
+    try {
+        const path = await provider.download(id)
+        return {
+            provider,
+            id,
+            path,
+            from: null,
+        }
+    } catch (e) {
+        return await getRandomQueue(count + 1)
+    }
+}
 
 async function nextQueue(c: VoiceConnection) {
     if (c.dispatcher) return c.dispatcher.end()
-    if (queue[c.channel.id] == null) return
-    const q = queue[c.channel.id].shift()
-    if (q == null) return
-    try {
-        await q.react.remove()
-        await q.msg.react(emojiDic["arrow_forward"]!)
-    } catch (e) {
-        console.error(e)
+    if (queue[c.channel.id] == null) {
+        queue[c.channel.id] = []
+    }
+    var q = queue[c.channel.id].shift()
+    if (q == null) {
+        if (autoQueue[c.channel.guild.id]) {
+            q = await getRandomQueue()
+            if (q == null) return
+        } else {
+            return
+        }
+    }
+    if (q.from != null) {
+        try {
+            await q.from.react.remove()
+            await q.from.msg.react(emojiDic["arrow_forward"]!)
+        } catch (e) {
+            console.error(e)
+        }
     }
     nowPlaying[c.channel.id] = q
     const dispatcher = c.playFile(q.path, {
@@ -53,30 +125,11 @@ async function nextQueue(c: VoiceConnection) {
     })
 
     const channel = loggingChannel[c.channel.guild.id]
-    if (channel != null) {
+    if (channel != null && q.from != null) {
         const url = q.provider.urlFromId(q.id)
-        await channel.send("NowPlaying: " + url + " requested by <@" + q.msg.author.id + ">", {
-            embed: await q.provider.richEmbed(q.id).catch(e => {
-                console.error(e)
-                if (e instanceof NotificatableError) {
-                    return {
-                        title: "カード展開エラー",
-                        description: e.message,
-                        color: 0xff0000,
-                        footer: {
-                            text: "musicbot-ts",
-                        },
-                    } as RichEmbedOptions
-                }
-                return {
-                    title: "カード展開エラー",
-                    description: "JavaScriptエラー",
-                    color: 0xff0000,
-                    footer: {
-                        text: "musicbot-ts",
-                    },
-                } as RichEmbedOptions
-            }),
+        const requestUser = q.from != null ? `<@${q.from.msg.author.id}>` : "autoqueue"
+        await channel.send("NowPlaying: " + url + " requested by <@" + q.from.msg.author.id + ">", {
+            embed: await getRichEmbedFromQueue(q),
         })
     }
 }
@@ -120,8 +173,10 @@ client.on("message", async msg => {
                             provider,
                             id,
                             path,
-                            msg,
-                            react: await msg.react(emojiDic["soon"]!),
+                            from: {
+                                msg,
+                                react: await msg.react(emojiDic["soon"]!),
+                            },
                         },
                         isWarikomi,
                     )
@@ -178,6 +233,32 @@ client.on("message", async msg => {
                 if (d == null) return await msg.reply("何も再生してなさそう")
                 d.end()
                 await msg.react(emojiDic["white_check_mark"]!)
+            },
+            async autoqueue() {
+                switch (args[1]) {
+                    case "enable":
+                        autoQueue[msg.guild.id] = true
+                        await msg.reply("autoqueue has enabled! Enjoy :)")
+                        const c = msg.guild.voiceConnection
+                        if (c && c.dispatcher == null) {
+                            await nextQueue(c)
+                        }
+                        break
+                    case "disable":
+                        delete autoQueue[msg.guild.id]
+                        await msg.reply("autoqueue has disabled.")
+                        break
+                    default:
+                        msg.reply(
+                            [
+                                "Usage:",
+                                "```",
+                                "!autoqueue <enable|disable>",
+                                "```",
+                                "Current: " + (autoQueue[msg.guild.id] ? "Enabled" : "Disabled"),
+                            ].join("\n"),
+                        )
+                }
             },
             async help() {
                 await msg.reply(
