@@ -4,7 +4,7 @@ import fs from "fs"
 import childProcess from "child_process"
 import { promisify } from "util"
 import { RichEmbedOptions } from "discord.js"
-import { NotificatableError } from "../notificatable-error"
+import { NotificatableError } from "../classes/notificatable-error"
 
 const execFile = promisify(childProcess.execFile)
 

@@ -1,4 +1,4 @@
-import { ProviderAndID } from "./provider-and-id"
+import { ProviderAndID } from "../classes/provider-and-id"
 
 export class DownloadQueue {
     static downloadPromise: { [key: string]: Promise<string> } = {}

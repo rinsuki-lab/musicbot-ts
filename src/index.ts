@@ -13,13 +13,13 @@ import {
 import { YouTubeProvider } from "./providers/youtube"
 import { NiconicoProvider } from "./providers/niconico"
 import { dic as emojiDic } from "pictograph"
-import { NotificatableError } from "./notificatable-error"
+import { NotificatableError } from "./classes/notificatable-error"
 import { IProvider } from "./interfaces/provider"
 import fs from "fs"
 import { isNotNull } from "./utils/is-not-null"
-import { ProviderManager } from "./provider-manager"
-import { ProviderAndID } from "./provider-and-id"
-import { DownloadQueue } from "./download-queue"
+import { ProviderManager } from "./singletons/provider-manager"
+import { ProviderAndID } from "./classes/provider-and-id"
+import { DownloadQueue } from "./singletons/download-queue"
 
 const client = new Client()
 

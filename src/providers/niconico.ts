@@ -1,7 +1,7 @@
 import fs, { watch } from "fs"
 import fetch from "node-fetch"
 import rndstr from "rndstr"
-import { NotificatableError } from "../notificatable-error"
+import { NotificatableError } from "../classes/notificatable-error"
 import { RichEmbedOptions } from "discord.js"
 
 export class NiconicoProvider {

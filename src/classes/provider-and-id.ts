@@ -1,4 +1,4 @@
-import { IProvider } from "./interfaces/provider"
+import { IProvider } from "../interfaces/provider"
 import { RichEmbedOptions } from "discord.js"
 import { NotificatableError } from "./notificatable-error"
 

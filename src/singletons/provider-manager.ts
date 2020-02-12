@@ -1,9 +1,9 @@
-import { YouTubeProvider } from "./providers/youtube"
-import { NiconicoProvider } from "./providers/niconico"
-import { IProvider } from "./interfaces/provider"
+import { YouTubeProvider } from "../providers/youtube"
+import { NiconicoProvider } from "../providers/niconico"
+import { IProvider } from "../interfaces/provider"
 import { RichEmbedOptions } from "discord.js"
-import { NotificatableError } from "./notificatable-error"
-import { ProviderAndID } from "./provider-and-id"
+import { NotificatableError } from "../classes/notificatable-error"
+import { ProviderAndID } from "../classes/provider-and-id"
 
 export class ProviderManager {
     private static providers: IProvider[] = [YouTubeProvider, NiconicoProvider]
