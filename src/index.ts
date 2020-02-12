@@ -271,6 +271,7 @@ client.on("message", async msg => {
             async np() {
                 const vc = msg.guild.voiceConnection
                 if (vc == null) return await msg.reply("ボイスチャンネルに入っていません")
+                console.log(vc.dispatcher.time, vc.dispatcher.totalStreamTime)
                 const q = nowPlaying[vc.channel.id]
                 if (q == null) return await msg.reply("何も再生していません")
                 const url = q.provider.urlFromId(q.id)
