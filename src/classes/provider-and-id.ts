@@ -13,6 +13,10 @@ export class ProviderAndID {
         return this.provider.urlFromId(this.id)
     }
 
+    get path() {
+        return this.provider.cachePath(this.id)
+    }
+
     getRichEmbed(): Promise<RichEmbedOptions> {
         return this.provider.richEmbed(this.id).catch(e => {
             console.error(e)

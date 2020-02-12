@@ -26,11 +26,11 @@ var loggingChannel: { [key: string]: TextChannel } = {}
 var autoQueue: { [key: string]: boolean } = {}
 var autoQueueSelectHistory: string[] = []
 
-var downloadingPromise: { [key: string]: Promise<string> } = {}
-
-function isFoundInQueue(provider: IProvider, id: string): boolean {
+function isFoundInQueue(pi: ProviderAndID): boolean {
     const allQueue = [...Object.values(nowPlaying), ...Object.values(queue).flatMap(q => q)]
-    return allQueue.find(que => que.pi.provider.key === provider.key && que.pi.id === id) != null
+    return (
+        allQueue.find(que => que.pi.provider.key === pi.provider.key && que.pi.id === pi.id) != null
+    )
 }
 
 async function getRandomQueue(count = 0): Promise<QueueObj | undefined> {
@@ -254,28 +254,24 @@ client.on("message", async msg => {
                 })
             },
             async recache() {
-                const result = ProviderManager.match(args[1])
-                if (result == null) return await msg.reply("マッチしませんでした…")
-                const { provider, id } = result
-                const key = [provider, id].join(":")
-                if (isFoundInQueue(provider, id))
+                const pi = ProviderManager.match(args[1])
+                if (pi == null) return await msg.reply("マッチしませんでした…")
+                const { key, path } = pi
+                if (isFoundInQueue(pi))
                     return await msg.reply("どこかのキューに積まれている状態でrecacheはできません")
-                if (downloadingPromise[key] != null)
+                if (DownloadQueue.downloadPromise[key])
                     return await msg.reply("ダウンロード中にはrecacheできません")
-                const path = provider.cachePath(id)
                 if (!fs.existsSync(path)) return await msg.reply("それはキャッシュしていません")
                 const p = (async () => {
                     await fs.promises.unlink(path)
                     try {
-                        return await provider.download(id)
+                        return await pi.downloadWithoutQueue()
                     } catch (e) {
                         await fs.promises.unlink(path)
                         throw e
-                    } finally {
-                        delete downloadingPromise[key]
                     }
                 })()
-                downloadingPromise[key] = p
+                DownloadQueue.registerDownloadPromise(pi, p)
                 const r = await msg.react(emojiDic["hourglass"]!)
                 await p
                 await r.remove()
