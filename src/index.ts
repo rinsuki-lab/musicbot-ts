@@ -8,6 +8,7 @@ import {
     TextChannel,
     RichEmbed,
     RichEmbedOptions,
+    VoiceChannel,
 } from "discord.js"
 import { YouTubeProvider } from "./providers/youtube"
 import { NiconicoProvider } from "./providers/niconico"
@@ -15,14 +16,15 @@ import { dic as emojiDic } from "pictograph"
 import { NotificatableError } from "./notificatable-error"
 import { IProvider } from "./interfaces/provider"
 import fs from "fs"
-
-const providers: IProvider[] = [YouTubeProvider, NiconicoProvider]
+import { isNotNull } from "./utils/is-not-null"
+import { ProviderManager } from "./provider-manager"
+import { ProviderAndID } from "./provider-and-id"
+import { DownloadQueue } from "./download-queue"
 
 const client = new Client()
 
 interface QueueObj {
-    provider: IProvider
-    id: string
+    pi: ProviderAndID
     path: string
     from: {
         msg: Message
@@ -38,59 +40,9 @@ var autoQueueSelectHistory: string[] = []
 
 var downloadingPromise: { [key: string]: Promise<string> } = {}
 
-function isNotNull<T>(input: T | null | undefined): input is T {
-    return input != null
-}
-
-function getProviderAndId(text: string): [IProvider, string] | null {
-    for (const provider of providers) {
-        const id = provider.test(text)
-        if (id == null) continue
-        return [provider, id]
-    }
-    return null
-}
-
-async function download(provider: IProvider, id: string): Promise<string> {
-    const key = [provider.key, id].join(":")
-    var p = downloadingPromise[key]
-    if (p) return await p
-    p = provider.download(id)
-    downloadingPromise[key] = p
-    try {
-        return await p
-    } finally {
-        delete downloadingPromise[key]
-    }
-}
-
 function isFoundInQueue(provider: IProvider, id: string): boolean {
     const allQueue = [...Object.values(nowPlaying), ...Object.values(queue).flatMap(q => q)]
-    return allQueue.find(que => que.provider.key === provider.key && que.id === id) != null
-}
-
-async function getRichEmbedFromQueue(q: QueueObj): Promise<RichEmbedOptions> {
-    return await q.provider.richEmbed(q.id).catch(e => {
-        console.error(e)
-        if (e instanceof NotificatableError) {
-            return {
-                title: "カード展開エラー",
-                description: e.message,
-                color: 0xff0000,
-                footer: {
-                    text: "musicbot-ts",
-                },
-            } as RichEmbedOptions
-        }
-        return {
-            title: "カード展開エラー",
-            description: "JavaScriptエラー",
-            color: 0xff0000,
-            footer: {
-                text: "musicbot-ts",
-            },
-        } as RichEmbedOptions
-    })
+    return allQueue.find(que => que.pi.provider.key === provider.key && que.pi.id === id) != null
 }
 
 async function getRandomQueue(count = 0): Promise<QueueObj | undefined> {
@@ -109,19 +61,16 @@ async function getRandomQueue(count = 0): Promise<QueueObj | undefined> {
     console.log("random selected file:", file[0])
     if (autoQueueSelectHistory.includes(file[0])) return await getRandomQueue(count + 1)
 
-    const providerKey = file[1]
-    const id = file[2]
-    const provider = providers.find(p => p.key === providerKey)
-    if (provider == null) return await getRandomQueue(count + 1)
+    const pi = ProviderManager.piFromKey(file[1] + ":" + file[2])
+    if (pi == null) return await getRandomQueue(count + 1)
     try {
-        const path = await provider.download(id)
+        const path = await DownloadQueue.download(pi)
         autoQueueSelectHistory.push(file[0])
         while (autoQueueSelectHistory.length >= 10) {
             autoQueueSelectHistory.shift()
         }
         return {
-            provider,
-            id,
+            pi,
             path,
             from: null,
         }
@@ -164,9 +113,9 @@ async function nextQueue(c: VoiceConnection) {
 
     const channel = loggingChannel[c.channel.guild.id]
     if (channel != null && q.from != null) {
-        const url = q.provider.urlFromId(q.id)
+        const url = q.pi.url
         await channel.send("NowPlaying: " + url + " requested by <@" + q.from.msg.author.id + ">", {
-            embed: await getRichEmbedFromQueue(q),
+            embed: await q.pi.getRichEmbed(),
         })
     }
 }
@@ -187,6 +136,21 @@ async function addQueue(c: VoiceConnection, q: QueueObj, isWarikomi: boolean) {
 
 client.on("message", async msg => {
     if (!msg.content.startsWith("!")) return
+
+    async function requireVCConnection(): Promise<VoiceConnection | undefined> {
+        const vc = msg.member.voiceChannel
+        if (vc == null) {
+            await msg.reply("通話に入ってから言ってください")
+            return
+        }
+        const c = vc.connection
+        if (c == null) {
+            await msg.reply("先に !join してください")
+            return
+        }
+        return c
+    }
+
     try {
         const args = msg.content.split(" ")
         const commandTable = {
@@ -194,21 +158,17 @@ client.on("message", async msg => {
                 await commandTable.play(true)
             },
             async play(isWarikomi = false) {
-                const vc = msg.member.voiceChannel
-                if (vc == null) return await msg.reply("通話に入ってから言ってください")
-                const c = vc.connection
-                if (c == null) return await msg.reply("先に !join してください")
-                const result = getProviderAndId(args[1])
-                if (result == null) return await msg.reply("マッチしませんでした…")
-                const [provider, id] = result
+                const c = await requireVCConnection()
+                if (c == null) return
+                const pi = ProviderManager.match(args[1])
+                if (pi == null) return await msg.reply("マッチしませんでした…")
                 const react = await msg.react(emojiDic["arrow_down"]!)
-                const path = await download(provider, id)
+                const path = await DownloadQueue.download(pi)
                 await react.remove()
                 addQueue(
                     c,
                     {
-                        provider,
-                        id,
+                        pi,
                         path,
                         from: {
                             msg,
@@ -237,32 +197,28 @@ client.on("message", async msg => {
                 }
             },
             async leave() {
-                const vc = msg.member.voiceChannel
-                if (vc == null) return await msg.reply("通話に入ってから言ってください")
-                const c = vc.connection
-                if (c == null) return await msg.reply("入ってませんけど…")
+                const c = await requireVCConnection()
+                if (c == null) return
                 c.disconnect()
             },
             async queue() {
-                const vc = msg.member.voiceChannel
-                if (vc == null) return await msg.reply("通話に入ってから言ってください")
-                const np = nowPlaying[vc.id]
-                const qs = queue[vc.id] || []
+                const c = await requireVCConnection()
+                if (c == null) return
+                const np = nowPlaying[c.channel.id]
+                const qs = queue[c.channel.id] || []
                 const m = [`${qs.length} queues`]
                 if (np != null) {
-                    m.push("Now Playing: " + np.provider.urlFromId(np.id))
+                    m.push("Now Playing: " + np.pi.url)
                     m.push("-----")
                 }
                 for (const [i, q] of qs.entries()) {
-                    m.push(`${i + 1}. ${q.provider.urlFromId(q.id)}`)
+                    m.push(`${i + 1}. ${q.pi.url}`)
                 }
                 await msg.reply(m.join("\n"))
             },
             async skip() {
-                const vc = msg.member.voiceChannel
-                if (vc == null) return await msg.reply("通話に入ってから言ってください")
-                const c = vc.connection
-                if (c == null) return await msg.reply("入ってませんけど…")
+                const c = await requireVCConnection()
+                if (c == null) return
                 const d = c.dispatcher
                 if (d == null) return await msg.reply("何も再生してなさそう")
                 d.end()
@@ -300,19 +256,19 @@ client.on("message", async msg => {
                 console.log(vc.dispatcher.time, vc.dispatcher.totalStreamTime)
                 const q = nowPlaying[vc.channel.id]
                 if (q == null) return await msg.reply("何も再生していません")
-                const url = q.provider.urlFromId(q.id)
+                const url = q.pi.url
                 const requestUser =
                     q.from != null
                         ? `<@${q.from.msg.author.id}>`
                         : "autoqueue (you can disable with `!autoqueue disable`)"
                 await msg.reply("NowPlaying: " + url + " requested by " + requestUser, {
-                    embed: await getRichEmbedFromQueue(q),
+                    embed: await q.pi.getRichEmbed(),
                 })
             },
             async recache() {
-                const result = getProviderAndId(args[1])
+                const result = ProviderManager.match(args[1])
                 if (result == null) return await msg.reply("マッチしませんでした…")
-                const [provider, id] = result
+                const { provider, id } = result
                 const key = [provider, id].join(":")
                 if (isFoundInQueue(provider, id))
                     return await msg.reply("どこかのキューに積まれている状態でrecacheはできません")
