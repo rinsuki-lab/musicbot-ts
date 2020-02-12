@@ -34,6 +34,7 @@ var nowPlaying: { [key: string]: QueueObj } = {}
 var queue: { [key: string]: QueueObj[] } = {}
 var loggingChannel: { [key: string]: TextChannel } = {}
 var autoQueue: { [key: string]: boolean } = {}
+var autoQueueSelectHistory: string[] = []
 
 function isNotNull<T>(input: T | null | undefined): input is T {
     return input != null
@@ -64,7 +65,10 @@ async function getRichEmbedFromQueue(q: QueueObj): Promise<RichEmbedOptions> {
 }
 
 async function getRandomQueue(count = 0): Promise<QueueObj | undefined> {
-    if (count > 10) return
+    if (count > 20) {
+        console.log("failed to select random queue...")
+        return
+    }
     const r = /^([a-z]+):([^\.]+)\.[^\.]+$/
 
     const files = await fs.promises
@@ -74,6 +78,7 @@ async function getRandomQueue(count = 0): Promise<QueueObj | undefined> {
     const file = files[Math.floor(Math.random() * files.length)]
     if (file == null) return
     console.log("random selected file:", file[0])
+    if (autoQueueSelectHistory.includes(file[0])) return await getRandomQueue(count + 1)
 
     const providerKey = file[1]
     const id = file[2]
@@ -81,6 +86,10 @@ async function getRandomQueue(count = 0): Promise<QueueObj | undefined> {
     if (provider == null) return await getRandomQueue(count + 1)
     try {
         const path = await provider.download(id)
+        autoQueueSelectHistory.push(file[0])
+        while (autoQueueSelectHistory.length >= 10) {
+            autoQueueSelectHistory.shift()
+        }
         return {
             provider,
             id,
