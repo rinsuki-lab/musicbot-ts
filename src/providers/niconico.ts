@@ -196,8 +196,6 @@ export class NiconicoProvider {
             )
         }
 
-        console.log(videoInfo)
-
         var thumbnailUrl = videoInfo.video.thumbnail_url.replace(/^http:/, "https:")
         if (videoInfo.video.options["@large_thumbnail"] === "1") {
             thumbnailUrl += ".M"
