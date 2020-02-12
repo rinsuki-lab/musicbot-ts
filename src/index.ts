@@ -259,21 +259,20 @@ client.on("message", async msg => {
                 const { key, path } = pi
                 if (isFoundInQueue(pi))
                     return await msg.reply("どこかのキューに積まれている状態でrecacheはできません")
-                if (DownloadQueue.downloadPromise[key])
+                if (DownloadQueue.processingNow[pi.key])
                     return await msg.reply("ダウンロード中にはrecacheできません")
                 if (!fs.existsSync(path)) return await msg.reply("それはキャッシュしていません")
-                const p = (async () => {
-                    await fs.promises.unlink(path)
-                    try {
-                        return await pi.downloadWithoutQueue()
-                    } catch (e) {
-                        await fs.promises.unlink(path)
-                        throw e
-                    }
-                })()
-                DownloadQueue.registerDownloadPromise(pi, p)
+                DownloadQueue.processingNow[pi.key] = true
                 const r = await msg.react(emojiDic["hourglass"]!)
-                await p
+                try {
+                    await fs.promises.unlink(path)
+                    await pi.downloadWithoutQueue()
+                } catch (e) {
+                    await fs.promises.unlink(path)
+                    throw e
+                } finally {
+                    delete DownloadQueue.processingNow[pi.key]
+                }
                 await r.remove()
                 await msg.reply("recacheに成功した気がします")
             },

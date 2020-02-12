@@ -1,28 +1,19 @@
 import { ProviderAndID } from "../classes/provider-and-id"
+import { NotificatableError } from "../classes/notificatable-error"
 
 export class DownloadQueue {
-    static downloadPromise: { [key: string]: Promise<string> } = {}
+    static processingNow: { [key: string]: boolean } = {}
 
-    static registerDownloadPromise(pi: ProviderAndID, p: Promise<string>) {
-        const key = pi.key
-        this.downloadPromise[key] = (async () => {
-            try {
-                return await p
-            } catch (e) {
-                throw e
-            } finally {
-                delete this.downloadPromise[key]
-            }
-        })()
-    }
+    static async download(pi: ProviderAndID): Promise<string> {
+        if (this.processingNow[pi.key])
+            throw new NotificatableError("他スレッドでダウンロード中です。しばらくお待ちください")
 
-    static download(pi: ProviderAndID): Promise<string> {
-        const key = pi.key
-        var promise = this.downloadPromise[key]
-        if (promise != null) return promise
+        this.processingNow[pi.key] = true
 
-        promise = pi.downloadWithoutQueue()
-        this.registerDownloadPromise(pi, promise)
-        return promise
+        try {
+            return await pi.downloadWithoutQueue()
+        } finally {
+            delete this.processingNow[pi.key]
+        }
     }
 }
