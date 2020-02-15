@@ -3,6 +3,7 @@ import fetch from "node-fetch"
 import rndstr from "rndstr"
 import { NotificatableError } from "../classes/notificatable-error"
 import { RichEmbedOptions } from "discord.js"
+import $ from "transform-ts"
 
 export class NiconicoProvider {
     static readonly key = "niconico"
@@ -32,17 +33,37 @@ export class NiconicoProvider {
         }
 
         // get guest watch params
-        const info = await fetch(
-            `https://public.api.nicovideo.jp/v1/ceweb/videos/${id}/trial-play.json`,
-            {
+        const info = $.either(
+            $.obj({ errorCode: $.string, errorMessage: $.string }),
+            $.obj({
+                type: $.literal("dmc"),
+                watch: $.obj({
+                    ver: $.number /* $.literal(1) */,
+                    id: $.string,
+                    serviceUserId: $.string,
+                    frontendId: $.number,
+                    frontendVersion: $.string,
+                    signature: $.string,
+                    audios: $.string,
+                    protocols: $.string,
+                    heartbeatLifetime: $.number,
+                    contentKeyTimeout: $.number,
+                    transferPresets: $.string,
+                }),
+                availableOutput: $.obj({
+                    id: $.string,
+                }),
+            }),
+        ).transformOrThrow(
+            await fetch(`https://public.api.nicovideo.jp/v1/ceweb/videos/${id}/trial-play.json`, {
                 headers: {
                     ...headers,
                     "X-Frontend-Id": "76",
                     "X-Frontend-Version": "4.6.0",
                 },
-            },
-        ).then(r => r.json())
-        if (info.errorCode) {
+            }).then(r => r.json()),
+        )
+        if ("errorCode" in info) {
             console.log(info)
             throw new NotificatableError(
                 `niconico.trialPlay: ${info.errorMessage} (code: ${info.errorCode})`,
@@ -72,11 +93,43 @@ export class NiconicoProvider {
         const query = Object.entries(guestWatchQuery)
             .map(i => i.map(encodeURIComponent).join("="))
             .join("&")
-        const guestWatchRes = await fetch(
-            `https://www.nicovideo.jp/api/guest_watch/${info.watch.id}?${query}`,
-            { headers },
-        ).then(r => r.json())
-        if (guestWatchRes.meta["error-code"]) {
+        const guestWatchRes = $.either(
+            $.obj({
+                meta: $.obj({
+                    status: $.number,
+                    "error-code": $.string,
+                    "error-message": $.string,
+                }),
+            }),
+            $.obj({
+                meta: $.obj({
+                    status: $.number,
+                }),
+                data: $.obj({
+                    session_api: $.obj({
+                        recipe_id: $.string,
+                        audios: $.array($.string),
+                        service_user_id: $.string,
+                        token: $.string,
+                        signature: $.string,
+                        auth_types: $.obj({
+                            http: $.literal("ht2"),
+                        }),
+                        player_id: $.string,
+                        content_key_timeout: $.number,
+                        heartbeat_lifetime: $.number,
+                        priority: $.number,
+                        transfer_presets: $.array($.string),
+                    }),
+                }),
+            }),
+        ).transformOrThrow(
+            await fetch(`https://www.nicovideo.jp/api/guest_watch/${info.watch.id}?${query}`, {
+                headers,
+            }).then(r => r.json()),
+        )
+
+        if (!("data" in guestWatchRes)) {
             console.error(guestWatchRes)
             throw new NotificatableError(
                 `niconico.guestWatchApi: ${guestWatchRes.meta["error-message"]} (code: ${guestWatchRes.meta["error-code"]})`,
@@ -138,7 +191,7 @@ export class NiconicoProvider {
         console.log(dmcParams)
 
         // create dmc session
-        const dmcRes = await fetch("https://api.dmc.nico/api/sessions?_format=json", {
+        const dmcResRaw = await fetch("https://api.dmc.nico/api/sessions?_format=json", {
             method: "POST",
             body: JSON.stringify(dmcParams),
             headers: {
@@ -146,11 +199,15 @@ export class NiconicoProvider {
                 "content-type": "application/json",
             },
         }).then(r => r.json())
+        const dmcRes = $.obj({
+            meta: $.obj({ status: $.number, message: $.string }),
+            data: $.optional($.obj({ session: $.obj({ id: $.string, content_uri: $.string }) })),
+        }).transformOrThrow(dmcResRaw)
         // console.log(dmcRes)
-        if (dmcRes.meta.status >= 400) {
+        if (dmcRes.data == null) {
             console.error(dmcRes.meta)
             throw new NotificatableError(
-                `niconico.dmcCreate: ${dmcRes.message} (status: ${dmcRes.status})`,
+                `niconico.dmcCreate: ${dmcRes.meta.message} (status: ${dmcRes.meta.status})`,
             )
         }
 
@@ -168,7 +225,7 @@ export class NiconicoProvider {
                     "user-agent": "NicoBox/4.6.0 (iPhone; iOS 13.3.1; Scale/2.00)",
                 },
                 method: "DELETE",
-                body: JSON.stringify(dmcRes.data),
+                body: JSON.stringify(dmcResRaw.data),
             },
         ).then(r => r.json())
         // console.log(dmcEndRes)
@@ -184,11 +241,31 @@ export class NiconicoProvider {
     }
 
     static async richEmbed(id: string): Promise<RichEmbedOptions> {
-        const videoInfo = await fetch(
-            `https://api.ce.nicovideo.jp/nicoapi/v1/video.info?v=${id}&__format=json`,
+        const videoInfo = $.either(
+            $.obj({
+                "@status": $.literal("fail"),
+                error: $.obj({ code: $.string, description: $.string }),
+            }),
+            $.obj({
+                "@status": $.literal("ok"),
+                video: $.obj({
+                    title: $.string,
+                    description: $.string,
+                    thumbnail_url: $.string,
+                    genre: $.obj({
+                        key: $.string,
+                        label: $.string,
+                    }),
+                    options: $.obj({
+                        "@large_thumbnail": $.literal("0", "1"),
+                    }),
+                }),
+            }),
+        ).transformOrThrow(
+            await fetch(`https://api.ce.nicovideo.jp/nicoapi/v1/video.info?v=${id}&__format=json`)
+                .then(r => r.json())
+                .then(r => r.nicovideo_video_response),
         )
-            .then(r => r.json())
-            .then(r => r.nicovideo_video_response)
         if (videoInfo["@status"] !== "ok") {
             console.error(videoInfo)
             throw new NotificatableError(

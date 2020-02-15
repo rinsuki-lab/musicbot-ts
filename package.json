@@ -19,6 +19,7 @@
         "node-fetch": "^2.6.0",
         "opusscript": "^0.0.7",
         "pictograph": "^2.3.0",
-        "rndstr": "^1.0.0"
+        "rndstr": "^1.0.0",
+        "transform-ts": "^0.3.0"
     }
 }

@@ -8,6 +8,7 @@ import { isNotNull } from "./utils/is-not-null"
 import { ProviderManager } from "./singletons/provider-manager"
 import { ProviderAndID } from "./classes/provider-and-id"
 import { DownloadQueue } from "./singletons/download-queue"
+import { ValidationErrors } from "transform-ts"
 
 const client = new Client()
 
@@ -310,6 +311,8 @@ client.on("message", async msg => {
             await msg.react(emojiDic["sos"]!)
             if (e instanceof NotificatableError) {
                 await msg.reply("😢 " + e.message)
+            } else if (e instanceof ValidationErrors) {
+                await msg.reply("transform-ts error: \n```\n" + e.message + "\n```")
             } else {
                 await msg.reply("JavaScript error…")
             }

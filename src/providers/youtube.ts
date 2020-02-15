@@ -1,3 +1,4 @@
+import $ from "transform-ts"
 import fetch from "node-fetch"
 import fs from "fs"
 import childProcess from "child_process"
@@ -71,7 +72,21 @@ export class YouTubeProvider {
             )
         }
 
-        const playerInfo = JSON.parse(videoInfo.player_response)
+        const playerInfo = $.obj({
+            videoDetails: $.obj({
+                title: $.string,
+                shortDescription: $.string,
+                thumbnail: $.obj({
+                    thumbnails: $.array(
+                        $.obj({
+                            url: $.string,
+                            width: $.number,
+                            height: $.number,
+                        }),
+                    ),
+                }),
+            }),
+        }).transformOrThrow(JSON.parse(videoInfo.player_response))
         console.log(playerInfo.videoDetails.thumbnail.thumbnails)
 
         return {

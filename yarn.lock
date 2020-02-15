@@ -121,6 +121,11 @@ snekfetch@^3.6.4:
   resolved "https://registry.yarnpkg.com/snekfetch/-/snekfetch-3.6.4.tgz#d13e80a616d892f3d38daae4289f4d258a645120"
   integrity sha512-NjxjITIj04Ffqid5lqr7XdgwM7X61c/Dns073Ly170bPQHLm6jkmelye/eglS++1nfTWktpP6Y2bFXjdPlQqdw==
 
+transform-ts@^0.3.0:
+  version "0.3.0"
+  resolved "https://registry.yarnpkg.com/transform-ts/-/transform-ts-0.3.0.tgz#6bdd81abf79d3aebc03ef60ef7731ee378539b49"
+  integrity sha512-8BGag7tLPt8FfNOTF1UCVyGQYv4RdbrdXxcTt6FdHSWHGAWAMwHiLjNbtxFfE057KNvs15Y7wvBHpK6r/c8LLA==
+
 tweetnacl@^1.0.0:
   version "1.0.3"
   resolved "https://registry.yarnpkg.com/tweetnacl/-/tweetnacl-1.0.3.tgz#ac0af71680458d8a6378d0d0d050ab1407d35596"

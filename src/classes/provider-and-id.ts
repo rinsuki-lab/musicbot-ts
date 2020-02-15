@@ -2,6 +2,7 @@ import { IProvider } from "../interfaces/provider"
 import { RichEmbedOptions } from "discord.js"
 import { NotificatableError } from "./notificatable-error"
 import { upToNLines } from "../utils/up-to-n-lines"
+import { ValidationErrors } from "transform-ts"
 
 export class ProviderAndID {
     constructor(public readonly provider: IProvider, public readonly id: string) {}
@@ -39,6 +40,16 @@ export class ProviderAndID {
                             text: "musicbot-ts",
                         },
                     } as RichEmbedOptions
+                }
+                if (e instanceof ValidationErrors) {
+                    return {
+                        title: "カード展開エラー",
+                        description: "transform-ts error: \n```\n" + e.message + "\n```",
+                        color: 0xff0000,
+                        footer: {
+                            text: "musicbot-ts",
+                        },
+                    }
                 }
                 return {
                     title: "カード展開エラー",
