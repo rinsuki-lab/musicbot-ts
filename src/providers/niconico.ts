@@ -247,6 +247,10 @@ export class NiconicoProvider {
                 error: $.obj({ code: $.string, description: $.string }),
             }),
             $.obj({
+                "@status": $.literal("maintenance"),
+                message: $.string,
+            }),
+            $.obj({
                 "@status": $.literal("ok"),
                 video: $.obj({
                     title: $.string,
@@ -266,7 +270,12 @@ export class NiconicoProvider {
                 .then(r => r.json())
                 .then(r => r.nicovideo_video_response),
         )
-        if (videoInfo["@status"] !== "ok") {
+        if (videoInfo["@status"] === "maintenance") {
+            throw new NotificatableError(
+                `niconico.richembed.videoInfo: ${videoInfo.message} (status: ${videoInfo["@status"]})`,
+            )
+        }
+        if (videoInfo["@status"] === "fail") {
             console.error(videoInfo)
             throw new NotificatableError(
                 `niconico.richEmbed.videoInfo: ${videoInfo.error.description} (code: ${videoInfo.error.code})`,
