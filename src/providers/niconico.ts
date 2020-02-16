@@ -241,35 +241,43 @@ export class NiconicoProvider {
     }
 
     static async richEmbed(id: string): Promise<RichEmbedOptions> {
-        const videoInfo = $.either(
+        const res = $.either(
             $.obj({
-                "@status": $.literal("fail"),
-                error: $.obj({ code: $.string, description: $.string }),
+                nicovideo_video_response: $.obj({
+                    "@status": $.literal("fail"),
+                    error: $.obj({ code: $.string, description: $.string }),
+                }),
             }),
             $.obj({
-                "@status": $.literal("maintenance"),
-                message: $.string,
+                nicovideo_response: $.obj({
+                    "@status": $.literal("maintenance"),
+                    message: $.string,
+                }),
             }),
             $.obj({
-                "@status": $.literal("ok"),
-                video: $.obj({
-                    title: $.string,
-                    description: $.string,
-                    thumbnail_url: $.string,
-                    genre: $.obj({
-                        key: $.string,
-                        label: $.string,
-                    }),
-                    options: $.obj({
-                        "@large_thumbnail": $.literal("0", "1"),
+                nicovideo_video_response: $.obj({
+                    "@status": $.literal("ok"),
+                    video: $.obj({
+                        title: $.string,
+                        description: $.string,
+                        thumbnail_url: $.string,
+                        genre: $.obj({
+                            key: $.string,
+                            label: $.string,
+                        }),
+                        options: $.obj({
+                            "@large_thumbnail": $.literal("0", "1"),
+                        }),
                     }),
                 }),
             }),
         ).transformOrThrow(
-            await fetch(`https://api.ce.nicovideo.jp/nicoapi/v1/video.info?v=${id}&__format=json`)
-                .then(r => r.json())
-                .then(r => r.nicovideo_video_response),
+            await fetch(
+                `https://api.ce.nicovideo.jp/nicoapi/v1/video.info?v=${id}&__format=json`,
+            ).then(r => r.json()),
         )
+        const videoInfo =
+            "nicovideo_response" in res ? res.nicovideo_response : res.nicovideo_video_response
         if (videoInfo["@status"] === "maintenance") {
             throw new NotificatableError(
                 `niconico.richembed.videoInfo: ${videoInfo.message} (status: ${videoInfo["@status"]})`,
