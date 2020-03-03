@@ -35,7 +35,10 @@ function isFoundInQueue(pi: ProviderAndID): boolean {
 }
 
 async function getRandomQueue(count = 0): Promise<QueueObj | undefined> {
-    if (count > 20) {
+    if (count > 10 && count % 2) {
+        autoQueueSelectHistory.shift()
+    }
+    if (count > 200) {
         console.log("failed to select random queue...")
         return
     }
@@ -52,12 +55,10 @@ async function getRandomQueue(count = 0): Promise<QueueObj | undefined> {
 
     const pi = ProviderManager.piFromKey(file[1] + ":" + file[2])
     if (pi == null) return await getRandomQueue(count + 1)
+    if (await checkBanned(pi)) return await getRandomQueue(count + 1)
     try {
         const path = await DownloadQueue.download(pi)
         autoQueueSelectHistory.push(file[0])
-        while (autoQueueSelectHistory.length >= 10) {
-            autoQueueSelectHistory.shift()
-        }
         return {
             pi,
             path,
@@ -123,6 +124,10 @@ async function addQueue(c: VoiceConnection, q: QueueObj, isWarikomi: boolean) {
     }
 }
 
+function checkBanned(pi: ProviderAndID): Promise<boolean> {
+    return new Promise(r => fs.exists(__dirname + "/../banned/" + pi.key, r))
+}
+
 client.on("message", async msg => {
     if (!msg.content.startsWith("!")) return
 
@@ -151,6 +156,7 @@ client.on("message", async msg => {
                 if (c == null) return
                 const pi = ProviderManager.match(args[1])
                 if (pi == null) return await msg.reply("マッチしませんでした…")
+                if (await checkBanned(pi)) return await msg.reply("This media has been banned.")
                 const react = await msg.react(emojiDic["arrow_down"]!)
                 const path = await DownloadQueue.download(pi)
                 await react.remove()
@@ -257,6 +263,7 @@ client.on("message", async msg => {
             async recache() {
                 const pi = ProviderManager.match(args[1])
                 if (pi == null) return await msg.reply("マッチしませんでした…")
+                if (await checkBanned(pi)) return await msg.reply("This media has been banned.")
                 const { key, path } = pi
                 if (isFoundInQueue(pi))
                     return await msg.reply("どこかのキューに積まれている状態でrecacheはできません")
