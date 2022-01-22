@@ -16,7 +16,7 @@
         "axios": "^0.19.2",
         "discord.js": "^11.5.1",
         "dotenv-safe": "^8.2.0",
-        "node-fetch": "^2.6.0",
+        "node-fetch": "^3.1.1",
         "opusscript": "^0.0.7",
         "pictograph": "^2.3.0",
         "rndstr": "^1.0.0",
